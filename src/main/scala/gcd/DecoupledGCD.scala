@@ -3,71 +3,28 @@
 package gcd
 
 import chisel3._
-import chisel3.util.Decoupled
+import chisel3.util.experimental.loadMemoryFromFile
 
-class GcdInputBundle(val w: Int) extends Bundle {
-  val value1 = UInt(w.W)
-  val value2 = UInt(w.W)
+class MultiWritePort extends Bundle {
+  val wrEnable = Input(Bool())
+  val wrAddr = Input(UInt(10.W))
+  val wrData = Input(UInt(8.W))
 }
-
-class GcdOutputBundle(val w: Int) extends Bundle {
-  val value1 = UInt(w.W)
-  val value2 = UInt(w.W)
-  val gcd    = UInt(w.W)
-}
-
-/**
-  * Compute Gcd using subtraction method.
-  * Subtracts the smaller from the larger until register y is zero.
-  * value input register x is then the Gcd.
-  * Unless first input is zero then the Gcd is y.
-  * Can handle stalls on the producer or consumer side
-  */
-class DecoupledGcd(width: Int) extends Module {
-  val input = IO(Flipped(Decoupled(new GcdInputBundle(width))))
-  val output = IO(Decoupled(new GcdOutputBundle(width)))
-
-  val xInitial    = Reg(UInt())
-  val yInitial    = Reg(UInt())
-  val x           = Reg(UInt())
-  val y           = Reg(UInt())
-  val busy        = RegInit(false.B)
-  val resultValid = RegInit(false.B)
-
-  input.ready := ! busy
-  output.valid := resultValid
-  output.bits := DontCare
-
-  when(busy)  {
-    when(x > y) {
-      x := x - y
-    }.otherwise {
-      y := y - x
+class DecoupledGcd() extends Module {
+  val io = IO(new Bundle {
+      val rdAddr = Input(UInt(10.W))
+      val rdData = Output(UInt(8.W))
+      val wrVec = Vec(4, new MultiWritePort())
+  })
+  
+  val mem = SyncReadMem(1024, UInt(8.W))
+  loadMemoryFromFile(mem, "/Users/seddonshen/Coding/MultiPortMemory/data.hex")
+  io.rdData := mem.read(io.rdAddr)
+  
+  for( i <- 0 to 3){
+    when(io.wrVec(i).wrEnable) {
+        mem.write(io.wrVec(i).wrAddr, io.wrVec(i).wrData)
     }
-    when(x === 0.U || y === 0.U) {
-      when(x === 0.U) {
-        output.bits.gcd := y
-      }.otherwise {
-        output.bits.gcd := x
-      }
+  }  
 
-      output.bits.value1 := xInitial
-      output.bits.value2 := yInitial
-      resultValid := true.B
-
-      when(output.ready && resultValid) {
-        busy := false.B
-        resultValid := false.B
-      }
-    }
-  }.otherwise {
-    when(input.valid) {
-      val bundle = input.deq()
-      x := bundle.value1
-      y := bundle.value2
-      xInitial := bundle.value1
-      yInitial := bundle.value2
-      busy := true.B
-    }
-  }
 }

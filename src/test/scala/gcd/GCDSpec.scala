@@ -20,33 +20,58 @@ import chisel3.experimental.BundleLiterals._
   */
 class GCDSpec extends AnyFreeSpec with ChiselScalatestTester {
 
-  "Gcd should calculate proper greatest common denominator" in {
-    test(new DecoupledGcd(16)) { dut =>
-      dut.input.initSource()
-      dut.input.setSourceClock(dut.clock)
-      dut.output.initSink()
-      dut.output.setSinkClock(dut.clock)
+  "Gcd should ssd" in {
+    test(new DecoupledGcd()) { dut =>
+      dut.io.rdAddr.poke("b0000_0000_00".U)
+      dut.clock.step(1)
+      println(dut.io.rdData.peek())
 
-      val testValues = for { x <- 0 to 10; y <- 0 to 10} yield (x, y)
-      val inputSeq = testValues.map { case (x, y) => (new GcdInputBundle(16)).Lit(_.value1 -> x.U, _.value2 -> y.U) }
-      val resultSeq = testValues.map { case (x, y) =>
-        (new GcdOutputBundle(16)).Lit(_.value1 -> x.U, _.value2 -> y.U, _.gcd -> BigInt(x).gcd(BigInt(y)).U)
-      }
+      dut.io.rdAddr.poke("b0000_0000_01".U)
+      dut.clock.step(1)
+      println(dut.io.rdData.peek())
 
-      fork {
-        // push inputs into the calculator, stall for 11 cycles one third of the way
-        val (seq1, seq2) = inputSeq.splitAt(resultSeq.length / 3)
-        dut.input.enqueueSeq(seq1)
-        dut.clock.step(11)
-        dut.input.enqueueSeq(seq2)
-      }.fork {
-        // retrieve computations from the calculator, stall for 10 cycles one half of the way
-        val (seq1, seq2) = resultSeq.splitAt(resultSeq.length / 2)
-        dut.output.expectDequeueSeq(seq1)
-        dut.clock.step(10)
-        dut.output.expectDequeueSeq(seq2)
-      }.join()
+      dut.io.rdAddr.poke("b0000_0000_10".U)
+      dut.clock.step(1)
+      println(dut.io.rdData.peek())
 
+      dut.io.rdAddr.poke("b0000_0000_11".U)
+      dut.clock.step(1)
+      println(dut.io.rdData.peek())
+
+
+      dut.io.wrVec(0).wrAddr.poke("b0000_0000_00".U)
+      dut.io.wrVec(0).wrEnable.poke(true.B)
+      dut.io.wrVec(0).wrData.poke("hff".U)
+
+      dut.io.wrVec(1).wrAddr.poke("b0000_0000_01".U)
+      dut.io.wrVec(1).wrEnable.poke(true.B)
+      dut.io.wrVec(1).wrData.poke("hfe".U)
+
+      dut.io.wrVec(2).wrAddr.poke("b0000_0000_10".U)
+      dut.io.wrVec(2).wrEnable.poke(true.B)
+      dut.io.wrVec(2).wrData.poke("hfd".U)
+
+      dut.io.wrVec(3).wrAddr.poke("b0000_0000_11".U)
+      dut.io.wrVec(3).wrEnable.poke(true.B)
+      dut.io.wrVec(3).wrData.poke("hfc".U)
+
+      dut.clock.step(1)
+
+      dut.io.rdAddr.poke("b0000_0000_00".U)
+      dut.clock.step(1)
+      println(dut.io.rdData.peek())
+    
+      dut.io.rdAddr.poke("b0000_0000_01".U)
+      dut.clock.step(1)
+      println(dut.io.rdData.peek())
+
+      dut.io.rdAddr.poke("b0000_0000_10".U)
+      dut.clock.step(1)
+      println(dut.io.rdData.peek())
+
+      dut.io.rdAddr.poke("b0000_0000_11".U)
+      dut.clock.step(1)
+      println(dut.io.rdData.peek())
     }
   }
 }
